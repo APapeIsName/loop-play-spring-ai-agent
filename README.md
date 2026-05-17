@@ -9,9 +9,9 @@ Spring AI + Ollama(qwen2.5) 기반 배달 상담 에이전트. 1~4단계 전부 
 # 또는: ./gradlew bootJar && java -jar build/libs/baedal-support-agent-0.0.1.jar
 ```
 
-> 상세 실험 원본·데이터(전체 JSON, jsonl)는 `.private/notes/`에 보존되어 있습니다.
 > 본 README는 QUEST 제출 가이드(API 응답 / 설계 결정 / 실패 관찰 / AI 코드 리뷰 /
-> 학습 기록)를 한 문서에 통합한 것입니다.
+> 학습 기록)를 한 문서에 통합한 **자기완결 제출본**입니다.
+> (상세 raw 실험 데이터·jsonl은 로컬 작업 노트로 보관 — 제출 레포 미포함)
 
 ---
 
@@ -42,8 +42,7 @@ neededInfo`), `@JsonPropertyDescription`로 필드 규칙을 모델에 전달.
  "customerAction":"","neededInfo":["주문번호"]}
 ```
 
-> 시나리오 3종 + 전 실행의 원본 JSON: `.private/notes/round1-quest2-results.jsonl`,
-> `round1-design-decisions.md` §8·§9.
+> (시나리오 3종 + 전 실행의 raw JSON은 로컬 실험 노트에 보관)
 
 ## 2단계 — `/api/v1/prompt-lab` (정량 비교)
 
@@ -57,8 +56,7 @@ neededInfo`), `@JsonPropertyDescription`로 필드 규칙을 모델에 전달.
 
 > 해석: `@JsonPropertyDescription`(스키마)이 분류를 강하게 고정해 categoryConsistency는
 > 프롬프트·temperature 차이를 거의 잡지 못함. 진짜 차이는 categoryCounts 분포와
-> 응답 *문장* 변동성에서 관찰됨(§2단계 설계 결정 참조). 원본: `.private/notes/
-> round1-quest2-summary.md`, `round1-quest2-ambiguous-summary.md`, `round1-quest2-promptmod-summary.md`.
+> 응답 *문장* 변동성에서 관찰됨(§2단계 설계 결정 참조).
 
 ## 3단계 — 동기 vs 스트리밍
 
