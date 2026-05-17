@@ -12,7 +12,3 @@ Spring AI 기반 배달 상담 에이전트 학습용 스타터 코드입니다.
 ```bash
 ./gradlew bootRun
 ```
-
-## 테스트
-
-이 README는 PR 워크플로우 검증용 테스트 커밋입니다.

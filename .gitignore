@@ -35,3 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Project private records (git 미추적) ###
+CLAUDE.md
+.claude/
