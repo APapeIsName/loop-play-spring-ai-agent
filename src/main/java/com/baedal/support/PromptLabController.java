@@ -2,6 +2,7 @@ package com.baedal.support;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.ollama.api.OllamaOptions;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -15,33 +16,39 @@ import java.util.stream.Collectors;
 public class PromptLabController {
 
     private final ChatClient.Builder builder;
+    private final PerformanceLoggingAdvisor performanceAdvisor;
 
-    // TODO [2단계]: 프롬프트 정량 비교 실험 엔드포인트를 구현하라.
-    //
-    // 구현 힌트:
-    // 1. req.systemPrompt()를 System Prompt로 설정한 ChatClient를 빌드한다.
-    // 2. req.repeat() 횟수만큼 반복하여 .entity(SupportResponse.class)를 호출한다.
-    // 3. 결과 리스트를 PromptLabResult.from()에 넘겨 통계를 계산한다.
-    //
-    // 실험 후:
-    // - 단순 프롬프트 vs 구조화된 프롬프트로 각 5회 호출
-    // - categoryConsistency 수치를 비교하여 README에 기록
+    // [2단계] 프롬프트 정량 비교 실험 엔드포인트.
+    // systemPrompt/temperature/repeat 를 받아 repeat 회 호출, 통계 + 원본 응답 반환.
     @PostMapping
     public PromptLabResult experiment(@RequestBody PromptLabRequest req) {
-        throw new UnsupportedOperationException("TODO: 구현하세요");
+        var client = builder.defaultSystem(req.systemPrompt())
+                .defaultAdvisors(performanceAdvisor).build();
+        var results = new ArrayList<SupportResponse>();
+        for (int i = 0; i < req.repeat(); i++) {
+            var spec = client.prompt().user(req.message());
+            if (req.temperature() != null) {
+                spec = spec.options(OllamaOptions.builder()
+                        .temperature(req.temperature()).build());
+            }
+            results.add(spec.call().entity(SupportResponse.class));
+        }
+        return PromptLabResult.from(results);
     }
 
     public record PromptLabRequest(
             String systemPrompt,
             String message,
-            int repeat
+            int repeat,
+            Double temperature   // null 이면 application.yml 기본값(0.3)
     ) {}
 
     public record PromptLabResult(
             int totalRuns,
             Map<String, Long> categoryCounts,
             Map<String, Long> urgencyCounts,
-            double categoryConsistency
+            double categoryConsistency,
+            List<SupportResponse> samples   // 원본 응답(실패 관찰용)
     ) {
         public static PromptLabResult from(List<SupportResponse> results) {
             var catCounts = results.stream()
@@ -55,7 +62,8 @@ public class PromptLabController {
 
             return new PromptLabResult(
                     results.size(), catCounts, urgCounts,
-                    results.isEmpty() ? 0 : (double) maxCat / results.size()
+                    results.isEmpty() ? 0 : (double) maxCat / results.size(),
+                    results
             );
         }
     }

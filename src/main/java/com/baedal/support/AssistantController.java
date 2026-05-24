@@ -1,0 +1,40 @@
+package com.baedal.support;
+
+import com.baedal.support.tool.OrderTools;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * Tool Calling이 적용된 자연어 응답 엔드포인트.
+ * <p>
+ * {@code /api/v1/support}가 Structured Output(JSON)을 반환하는 데 반해,
+ * 이 엔드포인트는 <b>Tool 호출의 흐름을 평문으로 관찰</b>하기 위한 용도다.
+ * DEBUG 로그와 함께 보면 Tool이 언제 어떻게 호출되는지 직관적으로 이해할 수 있다.
+ */
+@RestController
+@RequestMapping("/api/v1/assistant")
+public class AssistantController {
+
+    private final ChatClient chatClient;
+
+    public AssistantController(ChatClient.Builder builder,
+                               PerformanceLoggingAdvisor performanceAdvisor,
+                               OrderTools orderTools) {
+        // 강의 2.5.1 함정 회피: ChatClient.Builder는 싱글톤 빈이므로
+        // 매 요청마다 .defaultXxx()를 호출하면 Tool이 누적 등록되어 두 번째 요청부터 깨진다.
+        // 생성자에서 한 번만 빌드해 ChatClient를 재사용한다.
+        this.chatClient = builder
+                .defaultSystem(BaedalPrompt.SYSTEM_PROMPT)
+                .defaultAdvisors(performanceAdvisor)
+                .defaultTools(orderTools)
+                .build();
+    }
+
+    @PostMapping
+    public String ask(@RequestBody ChatRequest req) {
+        return chatClient.prompt()
+                .user(req.message())
+                .call()
+                .content();
+    }
+}
