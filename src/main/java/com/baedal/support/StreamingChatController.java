@@ -13,6 +13,7 @@ public class StreamingChatController {
 
     private final ChatClient.Builder builder;
 
+    // [3단계] Streaming: .call() 대신 .stream().content() 로 토큰을 즉시 흘려보냄.
     @PostMapping(produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<String> chatStream(@RequestBody ChatRequest req) {
         return builder

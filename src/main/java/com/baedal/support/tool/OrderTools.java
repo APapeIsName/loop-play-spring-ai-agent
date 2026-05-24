@@ -30,60 +30,89 @@ public class OrderTools {
 
     private final OrderMockService orderService;
 
-    // TODO [1단계-1] getOrderDetail Tool을 구현하라.
-    //
-    // 요구사항:
-    // - 메서드 위에 @Tool(description = "...") 을 달고, LLM이 읽을 한국어 설명을 작성한다.
-    //   description에는 최소 다음 4가지가 들어가야 한다:
-    //     (1) 무엇을 하는가
-    //     (2) 언제 호출해야 하는가 (예: 고객이 메뉴/금액/상태를 물을 때)
-    //     (3) 입력(orderId)의 형식 — 예: "YYYY-XXXX" (예: 2024-1234)
-    //     (4) 실패 시 반환값 — 존재하지 않는 주문번호면 null 반환
-    // - 파라미터에 @ToolParam(description = "...") 을 달아 한국어 설명을 작성한다.
-    // - log.info("[Tool] getOrderDetail(orderId={})", orderId); 로 호출을 로깅한다.
-    // - orderService.findById(orderId) 로 조회하여, 존재하면 toDetailView()로 변환, 없으면 null.
-    //
-    // 힌트: toDetailView(Order) 변환기는 아래에 이미 준비되어 있다.
-    public OrderDetailView getOrderDetail(String orderId) {
-        throw new UnsupportedOperationException("TODO [1단계-1]: getOrderDetail 구현");
+    @Tool(description = """
+            주어진 주문번호의 주문 내역(메뉴, 수량, 단가, 총 결제 금액, 주문 상태, 주문 시각, 예상 배달 완료 시각)을 조회한다.
+
+            [언제 호출]
+            - 고객이 메뉴, 수량, 결제 금액, 주문 시각 같은 구체적인 주문 내역을 물을 때.
+            - 예: "뭐 시켰지?", "얼마였어요?", "콜라 같이 시켰던가?"
+
+            [언제 호출하지 않음]
+            - 배달 진행 상황, 라이더 위치, "어디쯤?", "어떻게 됐어요?"처럼 진행/도착을 묻는 발화는 getDeliveryStatus를 호출한다.
+            - 주문번호가 발화에 없으면 호출하지 않는다.
+
+            [입력]
+            - orderId: "YYYY-XXXX" 형식. 예: "2024-1234"
+
+            [실패 시]
+            - 존재하지 않는 주문번호면 null을 반환한다. 예외를 던지지 않는다.
+            """)
+    public OrderDetailView getOrderDetail(
+            @ToolParam(description = "조회할 주문번호. YYYY-XXXX 형식. 예: 2024-1234") String orderId) {
+        log.info("[Tool] getOrderDetail(orderId={})", orderId);
+        return orderService.findById(orderId).map(this::toDetailView).orElse(null);
     }
 
-    // TODO [1단계-2] getDeliveryStatus Tool을 구현하라.
-    //
-    // 요구사항:
-    // - @Tool(description = "...") 에 "배달 중인 주문에만 라이더 위치가 유효함"을 명시한다.
-    // - @ToolParam(description = "...") 을 추가한다.
-    // - log.info("[Tool] getDeliveryStatus(orderId={})", orderId);
-    // - 존재하면 toDeliveryView()로 변환, 없으면 null 반환.
-    //
-    // 힌트: toDeliveryView(Order) 변환기는 아래에 이미 준비되어 있다.
-    public DeliveryStatusView getDeliveryStatus(String orderId) {
-        throw new UnsupportedOperationException("TODO [1단계-2]: getDeliveryStatus 구현");
+    @Tool(description = """
+            주어진 주문번호의 현재 배달 상태와 라이더 위치를 조회한다.
+            배달 중인 주문에 대해서만 라이더 위치가 반환되며,
+            아직 배달이 시작되지 않았거나 이미 배달 완료된 주문은 상태만 반환된다.
+            존재하지 않는 주문번호면 null을 반환한다.
+            """)
+    public DeliveryStatusView getDeliveryStatus(
+            @ToolParam(description = "배달 상태를 조회할 주문번호. YYYY-XXXX 형식. 예: 2024-1234") String orderId) {
+        log.info("[Tool] getDeliveryStatus(orderId={})", orderId);
+        return orderService.findById(orderId).map(this::toDeliveryView).orElse(null);
     }
 
-    // TODO [1단계-3] + [2단계] cancelOrder Tool을 구현하라.
-    //
-    // 1단계 요구사항:
-    // - @Tool(description = "...") 에 다음을 모두 포함한다:
-    //     (1) 취소 가능 조건: CREATED 또는 ACCEPTED 상태만 가능
-    //     (2) 취소 불가: COOKING 이후 상태 (조리 시작됨)
-    //     (3) 멱등성 안내: 이미 취소된 주문을 다시 요청하면 에러가 아닌 ALREADY_CANCELED 반환
-    //     (4) 결과 타입: CancelOrderResult (outcome 필드로 성공/실패 사유 확인)
-    // - @ToolParam 2개 (orderId, reason) 각각 한국어 설명.
-    // - log.info("[Tool] cancelOrder(orderId={}, reason={})", orderId, reason);
-    //
-    // 로직 분기 (Outcome 4가지 — CancelOrderResult.Outcome 참조):
-    //   1) 주문 없음                     → NOT_FOUND       (예외 대신 결과 값으로)
-    //   2) 이미 CANCELED 상태            → ALREADY_CANCELED (멱등성 핵심)
-    //   3) isCancelable() == false       → NOT_CANCELABLE  (COOKING/DELIVERING/DELIVERED)
-    //   4) 취소 가능                     → order.cancel(reason, LocalDateTime.now()) 후 CANCELED
-    //
-    // 2단계 추가 과제 (README에 관찰 기록):
-    // - 같은 orderId로 cancelOrder를 연속 2회 호출했을 때 1번째/2번째 응답 비교.
-    // - 멱등성 분기(이미 CANCELED 처리)를 "통째로 제거"한 버전을 한 번 돌려보고,
-    //   LLM의 응답이 어떻게 달라지는지 관찰한다.
-    public CancelOrderResult cancelOrder(String orderId, String reason) {
-        throw new UnsupportedOperationException("TODO [1단계-3]: cancelOrder 구현");
+    @Tool(description = """
+            주어진 주문번호의 주문을 취소한다. 결과는 항상 CancelOrderResult로 반환되며, outcome 필드로 처리 결과를 판단한다.
+
+            [언제 호출]
+            - 고객이 "취소해주세요", "취소할게요"처럼 명시적으로 주문 취소를 요청하고, 주문번호가 함께 제공된 경우에만 호출한다.
+
+            [언제 호출하지 않음]
+            - "취소 가능해요?", "취소되나요?"처럼 가능 여부/정책만 묻는 질문에는 호출하지 않는다.
+            - 환불 정책 일반 문의에는 호출하지 않는다.
+            - 주문번호가 발화에 없으면 호출하지 않는다.
+
+            [입력]
+            - orderId: "YYYY-XXXX" 형식. 예: "2024-1234"
+            - reason: 고객이 말한 취소 사유의 자연어 요약. 예: "집 앞에 사람이 없어요"
+
+            [반환되는 outcome 4종]
+            - CANCELED: 이번 호출에서 정상 취소됨.
+            - ALREADY_CANCELED: 이미 취소되어 있던 주문(멱등 처리 — 에러 아님).
+            - NOT_CANCELABLE: 조리 시작 이후 등 자동 취소 불가. 상담원 연결 안내가 필요한 상태.
+            - NOT_FOUND: 주문번호가 존재하지 않음.
+
+            [중요]
+            - 동일 주문을 두 번 취소 요청해도 예외를 던지지 않는다. 두 번째는 ALREADY_CANCELED로 동일한 정보를 돌려준다.
+            """)
+    public CancelOrderResult cancelOrder(
+            @ToolParam(description = "취소할 주문번호. YYYY-XXXX 형식. 예: 2024-1234") String orderId,
+            @ToolParam(description = "고객이 말한 취소 사유의 자연어 요약. 예: '집 앞에 사람이 없어요'") String reason) {
+        log.info("[Tool] cancelOrder(orderId={}, reason={})", orderId, reason);
+
+        Order order = orderService.findById(orderId).orElse(null);
+        if (order == null) {
+            return new CancelOrderResult(orderId, CancelOrderResult.Outcome.NOT_FOUND,
+                    "해당 주문번호를 찾을 수 없습니다.");
+        }
+
+        if (order.status() == OrderStatus.CANCELED) {
+            return new CancelOrderResult(orderId, CancelOrderResult.Outcome.ALREADY_CANCELED,
+                    "해당 주문은 이미 취소된 상태입니다. (취소 사유: " + order.canceledReason() + ")");
+        }
+
+        if (!order.isCancelable()) {
+            return new CancelOrderResult(orderId, CancelOrderResult.Outcome.NOT_CANCELABLE,
+                    "조리가 이미 시작되어(" + order.status() + ") 자동 취소가 불가합니다. 상담원 연결이 필요합니다.");
+        }
+
+        order.cancel(reason, LocalDateTime.now());
+        return new CancelOrderResult(orderId, CancelOrderResult.Outcome.CANCELED,
+                "주문이 취소되었습니다. 결제 취소는 카드사에 따라 최대 7영업일이 소요될 수 있습니다.");
     }
 
     // ------- 변환기 (참고용 — 수정할 필요 없음) -------
