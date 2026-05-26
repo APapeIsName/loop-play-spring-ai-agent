@@ -1,27 +1,35 @@
 package com.baedal.support;
 
-import lombok.RequiredArgsConstructor;
+import com.baedal.support.tool.OrderTools;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequiredArgsConstructor
 @RequestMapping("/api/v1/support")
 public class SupportController {
 
-    private final ChatClient.Builder builder;
+    private final ChatClient chatClient;
 
-    // TODO [1단계]: BaedalPrompt.SYSTEM_PROMPT를 적용하고 Structured Output을 반환하라.
-    //
-    // 구현 힌트:
-    // 1. builder.defaultSystem(...)으로 System Prompt를 설정한다.
-    // 2. .build().prompt().user(req.message()).call()으로 LLM을 호출한다.
-    // 3. .entity(SupportResponse.class)로 JSON -> DTO 변환을 받는다.
-    //
-    // 4단계에서 PerformanceLoggingAdvisor를 구현한 후,
-    // .defaultAdvisors(...)로 등록하여 토큰 수와 응답 시간을 로깅하라.
+    public SupportController(ChatClient.Builder builder,
+                             PerformanceLoggingAdvisor performanceAdvisor,
+                             OrderTools orderTools) {
+        // 강의 2.5.1 함정 회피: builder는 싱글톤이므로 생성자에서 한 번만 빌드한다.
+        // (Round 1까지는 매 요청 빌드해도 동작했지만, .defaultTools()를 추가하는 순간
+        //  두 번째 요청에서 Tool 이름 충돌로 깨진다.)
+        this.chatClient = builder
+                .defaultSystem(BaedalPrompt.SYSTEM_PROMPT)
+                .defaultAdvisors(performanceAdvisor, new SimpleLoggerAdvisor())
+                .defaultTools(orderTools)
+                .build();
+    }
+
+    // [1단계] SYSTEM_PROMPT + Structured Output + Tool Calling.
     @PostMapping
     public SupportResponse triage(@RequestBody ChatRequest req) {
-        throw new UnsupportedOperationException("TODO: 구현하세요");
+        return chatClient.prompt()
+                .user(req.message())
+                .call()
+                .entity(SupportResponse.class);
     }
 }
