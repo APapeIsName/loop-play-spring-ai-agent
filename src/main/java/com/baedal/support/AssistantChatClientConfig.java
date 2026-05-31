@@ -39,7 +39,7 @@ public class AssistantChatClientConfig {
         //   - 세션별 conversationId는 컨트롤러에서 호출 단위로 .advisors(a -> ...)로 주입한다.
         return builder
                 .defaultSystem(BaedalPrompt.SYSTEM_PROMPT)
-                .defaultAdvisors(performanceAdvisor) // TODO: memoryAdvisor를 첫 번째로 추가
+                .defaultAdvisors(memoryAdvisor, performanceAdvisor)
                 .defaultTools(orderTools)
                 .build();
     }

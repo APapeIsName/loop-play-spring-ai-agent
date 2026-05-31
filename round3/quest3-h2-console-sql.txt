@@ -1,0 +1,58 @@
+# QUEST 3 자가 점검 — H2 Console SQL 캡처
+
+> H2 Shell tool로 SPRING_AI_CHAT_MEMORY 테이블 직접 조회 (브라우저 H2 Console 없이).
+>
+> 측정 일시: 2026-05-31
+> H2 jar: ~/.gradle/caches/modules-2/files-2.1/com.h2database/h2/2.3.232/h2-2.3.232.jar
+> DB: /private/tmp/loopers-quest3/data/baedal-jdbc.mv.db (워크트리 round-3-jdbc 영속성 검증 시 생성)
+> sessionId: file-persist-test (영속성 검증 단발 호출)
+
+## 1. 행 조회 — `SELECT * FROM SPRING_AI_CHAT_MEMORY ORDER BY "timestamp"`
+
+```
+CONVERSATION_ID   | TYPE      | timestamp               | CONTENT_PREVIEW
+file-persist-test | USER      | 2026-05-31 17:19:56.198 | 2024-1234 어디쯤이에요?
+file-persist-test | ASSISTANT | 2026-05-31 17:19:56.199 | 현재 2024-1234 주문은 배달 중이며 라이더는 역삼역 사거리 부근에 있습니다. 예상 도착 시간은 2026년 5월 31일 오후 5시 34분
+(2 rows, 4 ms)
+```
+
+## 2. 행 수
+
+```
+ROW_COUNT
+2
+(1 row, 5 ms)
+```
+
+## 3. 스키마 (CREATE TABLE 결과 확인)
+
+```
+FIELD           | TYPE                   | NULL | KEY | DEFAULT
+CONVERSATION_ID | CHARACTER VARYING(36)  | NO   |     | NULL
+CONTENT         | CHARACTER LARGE OBJECT | NO   |     | NULL
+TYPE            | CHARACTER VARYING(10)  | NO   |     | NULL
+timestamp       | TIMESTAMP              | NO   |     | NULL
+(4 rows, 12 ms)
+```
+
+→ `schema-h2.sql` 직접 작성한 스키마 적용 정상 확인 (CLOB = CHARACTER LARGE OBJECT, VARCHAR(36)·VARCHAR(10) 매핑).
+
+## 4. 검증 시사점
+
+- **재시작 후에도 행 유지** (h2:file 영속성) — SessionController API 검증과 SQL 직접 조회 결과 일치
+- **USER × 1 + ASSISTANT × 1 = 2 rows** — `MessageChatMemoryAdvisor.after()`가 USER/ASSISTANT만 저장 (발제 4.5 + 바이트코드 검증 일치)
+- **ToolMessage 없음** — Memory 외부 layer (ChatClient 내부 history)에 존재하는 것 정합 (4단계 +1200 토큰 미스터리 해결과 일관)
+
+## 5. 운영 시 추가 SQL 예 (참고)
+
+```sql
+-- 90일 이전 세션 자동 삭제 (Round 5 TTL 정책)
+DELETE FROM SPRING_AI_CHAT_MEMORY WHERE "timestamp" < NOW() - INTERVAL '90' DAY;
+
+-- 활성 세션 수
+SELECT COUNT(DISTINCT conversation_id) AS active_sessions FROM SPRING_AI_CHAT_MEMORY;
+
+-- 세션별 메시지 수 분포
+SELECT conversation_id, COUNT(*) AS msg_count FROM SPRING_AI_CHAT_MEMORY
+GROUP BY conversation_id ORDER BY msg_count DESC LIMIT 10;
+```

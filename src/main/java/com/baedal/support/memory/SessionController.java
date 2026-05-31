@@ -39,8 +39,7 @@ public class SessionController {
     //     → USER 2건 + ASSISTANT 2건이 순서대로 보여야 한다.
     @GetMapping("/{sessionId}/messages")
     public List<MessageView> messages(@PathVariable String sessionId) {
-        // TODO: chatMemory.get(sessionId)를 MessageView 리스트로 변환
-        return Collections.emptyList();
+        return chatMemory.get(sessionId).stream().map(MessageView::from).toList();
     }
 
     // TODO [1단계-F] 세션을 비우라.
@@ -53,7 +52,8 @@ public class SessionController {
     //   - 2024-1234 대화 후 이 엔드포인트 호출 → "그거" 질문이 다시 맥락을 못 찾아야 한다.
     @DeleteMapping("/{sessionId}")
     public void clear(@PathVariable String sessionId) {
-        // TODO: chatMemory.clear(sessionId) + 로그
+        chatMemory.clear(sessionId);
+        log.info("[Session] clear sessionId={}", sessionId);
     }
 
     // TODO [1단계-G] Repository에 등록된 모든 세션 ID를 반환하라.
@@ -66,8 +66,7 @@ public class SessionController {
     //     → ["A-id", "B-id"] 가 나와야 한다. (세션 분리 검증)
     @GetMapping("/ids")
     public List<String> sessions() {
-        // TODO: chatMemoryRepository.findConversationIds() 반환
-        return Collections.emptyList();
+        return chatMemoryRepository.findConversationIds();
     }
 
     public record MessageView(String type, String content) {

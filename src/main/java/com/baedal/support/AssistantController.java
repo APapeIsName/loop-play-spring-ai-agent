@@ -53,12 +53,13 @@ public class AssistantController {
     //     (힌트: 헤더를 안 보낸 여러 고객의 대화가 섞여 버린다 = 심각한 개인정보 사고)
     //   - 프로덕션에서 세션 식별의 실무 대안(쿠키 / JWT 클레임 / URL 경로)은 각각 어떤 장단점이 있는가?
     @PostMapping
-    public String ask(@RequestBody ChatRequest req) {
-        // TODO: @RequestHeader로 sessionId를 받고, .advisors(...) 로 conversationId를 주입하라.
+    public String ask(@RequestBody ChatRequest req,
+                      @RequestHeader(value = "X-Session-Id", defaultValue = "default") String sessionId) {
+        log.info("[Assistant] sessionId={}, message={}", sessionId, req.message());
         return assistantChatClient
                 .prompt()
                 .user(req.message())
-                // TODO: .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId))
+                .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, sessionId))
                 .call()
                 .content();
     }

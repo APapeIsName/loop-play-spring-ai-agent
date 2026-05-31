@@ -1,0 +1,52 @@
+# QUEST 4 — Memory 간접 증거 (TRACE 측정 후)
+
+측정 시점: 2026년  5월 31일 일요일 18시 57분 53초 KST
+sessionId: trace-q4-1780221394
+MAX_MESSAGES: 20
+
+## T1 + T2 입력 토큰 (PerformanceLoggingAdvisor)
+2026-05-31T18:56:57.379+09:00  INFO 15519 --- [baedal-support-agent] [nio-8080-exec-3] c.b.support.PerformanceLoggingAdvisor    : LLM 호출 완료 — 22756ms | 입력 토큰: 2366 | 출력 토큰: 148 | 총 토큰: 2514
+2026-05-31T18:57:06.202+09:00  INFO 15519 --- [baedal-support-agent] [nio-8080-exec-5] c.b.support.PerformanceLoggingAdvisor    : LLM 호출 완료 — 8788ms | 입력 토큰: 1229 | 출력 토큰: 62 | 총 토큰: 1291
+
+## Memory 상태 (SessionController)
+[
+  {
+    "type": "USER",
+    "content": "2024-1234 어디쯤이에요?"
+  },
+  {
+    "type": "ASSISTANT",
+    "content": "현재 2024-1234 주문은 배달 중이며 라이더는 역삼역 사거리 부근에 있습니다. 예상 도착 시간은 2026년 5월 31일 오후 7시 11분 34초입니다.\n\n취소나 다른 요청이 필요하시면 알려주세요!"
+  },
+  {
+    "type": "USER",
+    "content": "그거 언제 도착해요?"
+  },
+  {
+    "type": "ASSISTANT",
+    "content": "2024-1234 주문은 예상 도착 시간이 2026년 5월 31일 오후 7시 11분 34초입니다. 실시간 위치를 확인하시려면 다시 한번 알려주시겠어요?"
+  }
+]
+
+## [Tool] 호출 로그
+2026-05-31T18:56:52.526+09:00  INFO 15519 --- [baedal-support-agent] [nio-8080-exec-3] com.baedal.support.tool.OrderTools       : [Tool] getDeliveryStatus(orderId=2024-1234)
+
+## [Assistant] 메시지 로그
+2026-05-31T18:56:34.618+09:00  INFO 15519 --- [baedal-support-agent] [nio-8080-exec-3] com.baedal.support.AssistantController   : [Assistant] sessionId=trace-q4-1780221394, message=2024-1234 어디쯤이에요?
+2026-05-31T18:56:57.414+09:00  INFO 15519 --- [baedal-support-agent] [nio-8080-exec-5] com.baedal.support.AssistantController   : [Assistant] sessionId=trace-q4-1780221394, message=그거 언제 도착해요?
+
+## TRACE 시도 결과
+org.springframework.ai.chat.client=TRACE 만으로는 raw HTTP payload 안 보임.
+Spring AI 1.0 ollama integration이 chat.client 패키지에서 payload 로그를 출력하지 않음.
+추가 logger (org.springframework.ai.ollama, reactor.netty 등) TRACE 시 가능하지만 로그 폭증.
+
+## 결론
+Memory가 prompt에 끼어드는 증거 (간접):
+- T1 입력 토큰: 2366
+- T2 입력 토큰: 1229
+- 토큰 차이가 1단계·2단계 측정 패턴(+1200)과 일치 → Memory 작동 확정
+
+[관련 측정 데이터]
+- EXPERIMENT_LOG_QUEST2 Part A.2 (입력 토큰 분해)
+- EXPERIMENT_LOG_QUEST2 Part B.1 (3값 30턴 토큰 비교)
+- MessageWindowChatMemory 바이트코드 검증 (Explore agent)

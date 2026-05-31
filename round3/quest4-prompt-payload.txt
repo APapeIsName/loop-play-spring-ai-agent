@@ -1,0 +1,102 @@
+# QUEST 4 자가 점검 — Memory가 끼어든 2회차 prompt 전문
+
+> Spring AI ollama integration의 raw HTTP request body 캡처 시도.
+> logger: `org.springframework.web.client=DEBUG` + `reactor.netty.http.client=DEBUG`
+> 측정 일시: 2026-05-31 21:34~21:35 KST
+> sessionId: payload-cap-1780230877
+
+## 측정 시퀀스
+
+- T1: "2024-1234 어디쯤이에요?"
+- T2: "그거 언제 도착해요?" (Memory에서 이전 USER+ASSISTANT가 prompt에 끼어드는 것 검증)
+
+## Ollama HTTP 호출 (3회)
+
+```
+Connection 1: 21:34:37 — T1의 LLM 호출 (Memory empty 시작)
+Connection 2: 21:34:53 — T2의 첫 LLM 호출 (Memory 끼어든 prompt) ⭐
+Connection 3: 21:35:01 — T2의 follow-up LLM 호출 (Tool 호출 후)
+```
+
+## T1 prompt (line 33) — Memory 없는 첫 호출
+
+```
+Writing [ChatRequest[
+  model=qwen2.5,
+  messages=[
+    Message[role=SYSTEM, content=당신은 '배달' 고객 상담 AI 에이전트입니다. ...],
+    Message[role=USER, content=2024-1234 어디쯤이에요?, ...]
+  ],
+  tools=[Tool[getOrderDetail], Tool[getDeliveryStatus], Tool[cancelOrder]],
+  options={temperature=0.3}
+]
+```
+
+→ 2 메시지 (SYSTEM + 새 USER).
+
+## T2 prompt (line 91) — Memory 끼어든 두 번째 호출 ⭐ (자가 점검 핵심)
+
+```
+Writing [ChatRequest[
+  model=qwen2.5,
+  messages=[
+    Message[role=USER, content=2024-1234 어디쯤이에요?, images=null, toolCalls=null],          ← ⭐ Memory에서 끼어든 1턴 USER
+    Message[role=ASSISTANT, content=주문번호를 알려주시겠어요? 현재 배송 상태와 위치를 확인해드리려면 정확한 주문 정보가 필요합니다.,
+            images=null, toolCalls=null],                                                       ← ⭐ Memory에서 끼어든 1턴 ASSISTANT
+    Message[role=SYSTEM, content=당신은 '배달' 고객 상담 AI 에이전트입니다. ...],
+    Message[role=USER, content=그거 언제 도착해요?, ...]                                        ← 새 T2 발화
+  ],
+  tools=[Tool[getOrderDetail], Tool[getDeliveryStatus], Tool[cancelOrder]],
+  options={temperature=0.3}
+]
+```
+
+→ **4 메시지** (1턴 USER + 1턴 ASSISTANT + SYSTEM + 새 USER).
+
+## 검증 결론 — *발제 2.6 체크포인트* 정확히 직접 증명
+
+발제 *"2회차 DEBUG 로그에서 프롬프트 길이가 1회차보다 길어졌는지 눈으로 확인"* → **확인 ✓**
+
+### 메시지 수 변화
+- T1: 2 messages (SYSTEM + USER)
+- T2: **4 messages** (USER + ASSISTANT + SYSTEM + USER)
+
+### Memory 정체 — 발제 4.5 + 바이트코드 검증 모두 정합
+- `MessageChatMemoryAdvisor.after()`가 USER + ASSISTANT만 저장
+- T2 prompt에 *정확히 그 USER + ASSISTANT*가 끼어듦
+- **ToolMessage 없음** (Memory 외부, ChatClient 내부 history에 별도)
+
+### 1단계 발견 5 (+1200 토큰 미스터리) 정량 정합
+- T1 입력 토큰: ~1115 (SYSTEM + Tool 스키마 + 1 USER)
+- T2 입력 토큰: ~2400 (T1 + Memory 1턴 USER+ASSISTANT + Tool 응답 layer)
+- 차이 ~1285 = Memory layer (~150) + Tool layer (~1100) — *4단계 토큰 분해와 일치*
+
+## ChatRequest 구조 (Spring AI 1.0 ollama)
+
+```java
+ChatRequest[
+  model: String                  // "qwen2.5"
+  messages: List<Message>        // role + content (+ images + toolCalls)
+  tools: List<Tool>              // Function descriptions
+  options: Map<String, Object>   // {temperature, ...}
+]
+
+Message[
+  role: SYSTEM | USER | ASSISTANT | TOOL
+  content: String
+  images: null  (지원되지만 unused)
+  toolCalls: null  (Tool 호출 시 채움)
+]
+```
+
+## 측정 인프라 주의
+
+- `org.springframework.web.client=DEBUG` 로거가 *RestClient의 outgoing request body*를 출력
+- `reactor.netty.http.client=DEBUG`는 *HTTP 연결 메타데이터* (URI, response status)만 — body 미출력
+- `org.springframework.ai.chat.client=TRACE`만으로는 *raw HTTP body 미보임* (이전 시도)
+- 측정 후 반드시 logger 복원 (로그 폭증)
+
+## 응답
+
+- T1: *"주문번호를 알려주시겠어요? 현재 배송 상태와 위치를 확인해드리려면 정확한 주문 정보가 필요합니다."* (Tool 호출 X — starter description 영향)
+- T2: *"현재 라이더는 역삼역 사거리 부근에서 배송 중입니다. 예상 도착 시간은 2026년 5월 31일 ..."* (Tool 호출 O — Memory에서 1234 추출)

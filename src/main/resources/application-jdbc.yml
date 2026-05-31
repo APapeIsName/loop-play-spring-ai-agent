@@ -20,8 +20,11 @@
 spring:
   application:
     name: baedal-support-agent
+  # jdbc 프로필 시 application.yml의 DataSourceAutoConfiguration exclude를 빈 배열로 덮어 활성화.
+  autoconfigure:
+    exclude: []
   datasource:
-    url: jdbc:h2:mem:baedal;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:file:./data/baedal-jdbc;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
     username: sa
     password:
     driver-class-name: org.h2.Driver
@@ -42,7 +45,7 @@ spring:
       memory:
         repository:
           jdbc:
-            initialize-schema: embedded   # always / never / embedded
+            initialize-schema: always   # h2:file은 embedded로 인식 안 되어 always 필요 (QUEST 3단계 함정)
 
 logging:
   level:
