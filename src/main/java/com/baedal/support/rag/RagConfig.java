@@ -45,7 +45,10 @@ public class RagConfig {
     //   - 너무 작으면(예: 1): 관련 정책을 놓친다 — 복합 질문("환불 + 지연")에서 실패 관찰 가능.
     //   - 너무 크면(예: 10): 프롬프트에 정책 원문 10개가 들어가 입력 토큰이 폭증한다.
     //   - 배달 정책 문서 수(7건 내외)를 고려하라.
-    private static final int TOP_K = 4; // TODO: 왜 이 값인지 README에 근거 기록
+    // 정식 결정: K=4 — 1단계 sweep 측정(K=1·4·7·10 × 60 ask = 240 ask) 결과 *역U자* 발견.
+    // K=4가 정성 정답률(scn 1·2·3 모두 7/10)과 latency·토큰 비용(+6.9%/+7%) 균형 최적.
+    // 근거 raw: .private/notes/round4/quest1-topk-sweep.jsonl + round4/EXPERIMENT_LOG_QUEST1.md
+    private static final int TOP_K = 4;
 
     // TODO [1단계-B] SIMILARITY_THRESHOLD 값을 결정하라.
     //
@@ -58,7 +61,13 @@ public class RagConfig {
     //   - 너무 낮으면(0.3): 도메인 밖 질문("오늘 점심 뭐?")에도 무관 정책이 Top-K에 들어가
     //     LLM이 그걸 근거라고 오해해 환각을 만든다.
     //   - 너무 높으면(0.8): 정답 문서도 걸러져 Context가 비어 Fallback만 나온다.
-    private static final double SIMILARITY_THRESHOLD = 0.5; // TODO: 왜 이 값인지 README에 근거 기록
+    // 정식 결정: T=0.5 — 1단계 sweep 측정(T=0.5·0.65·0.75 × 60 ask = 180 ask) 결과.
+    // T=0.65/0.75에서 scn 1·2·3 정답률 *cliff drop 0/10* — 가설 부정.
+    // 진단(input token collapse + 정책 키워드 소실 + 결정적 fallback) high confidence로
+    // "한국어 + 짧은 정책 FAQ"에서 정답 청크 score가 ~0.5 부근에 분포함을 확인.
+    // Qwen3 모델 카드 일반론(0.60~0.76)을 우리 도메인에서 *반박*하는 학습 가치 ↑.
+    // 근거 raw: .private/notes/round4/quest1-threshold-sweep.jsonl + round4/EXPERIMENT_LOG_QUEST1.md
+    private static final double SIMILARITY_THRESHOLD = 0.5;
 
     // TODO [1단계-C] TokenTextSplitter Bean을 등록하라.
     //
@@ -78,8 +87,14 @@ public class RagConfig {
     //   - 만약 문서가 "사용자 리뷰 10만 건"이라면 청크 크기 선택이 어떻게 달라져야 하는가?
     @Bean
     public TokenTextSplitter tokenTextSplitter() {
-        // TODO: TokenTextSplitter 인스턴스 반환
-        return null;
+        // 임시값 (starter 권장 그대로) — 2단계에서 400/200 및 no-chunking과 비교 측정 예정
+        return new TokenTextSplitter(
+                800,    // chunkSize
+                350,    // minChunkSizeChars
+                5,      // minChunkLengthToEmbed
+                10_000, // maxNumChunks
+                true    // keepSeparator
+        );
     }
 
     // TODO [1단계-D] QuestionAnswerAdvisor Bean을 등록하라.
@@ -106,7 +121,15 @@ public class RagConfig {
     //   - similarityThreshold만으로 환각을 100% 막을 수 있는가? Fallback 프롬프트와 어떻게 협업하는가?
     @Bean
     public QuestionAnswerAdvisor questionAnswerAdvisor(VectorStore vectorStore) {
-        // TODO: SearchRequest + QuestionAnswerAdvisor 빌드해 반환 (order=20)
-        return null;
+        // 임시값: TOP_K=4 출발 (1단계 측정에서 K=1·4·7·10 sweep), THRESHOLD=0.5
+        SearchRequest searchRequest = SearchRequest.builder()
+                .topK(TOP_K)
+                .similarityThreshold(SIMILARITY_THRESHOLD)
+                .build();
+
+        return QuestionAnswerAdvisor.builder(vectorStore)
+                .searchRequest(searchRequest)
+                .order(20)   // Memory(10) 뒤, Performance(100) 앞
+                .build();
     }
 }

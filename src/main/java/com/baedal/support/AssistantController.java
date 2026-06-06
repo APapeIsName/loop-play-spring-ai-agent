@@ -25,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
  * Memory가 먼저 "아까 그 주문"을 해석해 주어야 Q&A가 "그 주문의 환불 정책"을 검색할 수 있다.
  * <p>
  * ⚠️ <b>주의</b>: {@link ChatClient.Builder}는 싱글톤 빈이므로 매 요청마다
- * {@code .defaultTools(...)} / {@code .defaultAdvisors(...)}를 호출하면 누적되어
+ * {@code .defaultTools(...)} / {@code .defaultAdvisors(memoryAdvisor, ragAdvisor, performanceAdvisor)}를 호출하면 누적되어
  * 두 번째 요청부터 {@code "Multiple tools with the same name"} 오류가 발생한다.
  * 그래서 3주차부터 생성자에서 한 번만 {@link ChatClient}를 빌드해 재사용한다.
  */
@@ -38,7 +38,7 @@ public class AssistantController {
 
     // TODO [1단계-G] Advisor 체인에 ragAdvisor를 추가하라.
     //
-    // 요구사항: 아래 생성자의 .defaultAdvisors(...)를 다음과 같이 바꾼다.
+    // 요구사항: 아래 생성자의 .defaultAdvisors(memoryAdvisor, ragAdvisor, performanceAdvisor)를 다음과 같이 바꾼다.
     //   .defaultAdvisors(memoryAdvisor, ragAdvisor, performanceAdvisor)
     //                    ^^^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^
     //                    order=10       order=20    order=100
@@ -60,8 +60,7 @@ public class AssistantController {
                                OrderTools orderTools) {
         this.chatClient = builder
                 .defaultSystem(BaedalPrompt.SYSTEM_PROMPT)
-                // TODO: memoryAdvisor 다음, performanceAdvisor 앞에 ragAdvisor를 추가하라.
-                .defaultAdvisors(memoryAdvisor, performanceAdvisor)
+                .defaultAdvisors(memoryAdvisor, ragAdvisor, performanceAdvisor)
                 .defaultTools(orderTools)
                 .build();
     }

@@ -21,7 +21,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: baedal-pgvector
     ports:
-      - "5432:5432"
+      - "5433:5432"   # 호스트 5432는 EnterpriseDB PostgreSQL 18 점유 → 5433으로 우회
     environment:
       POSTGRES_USER: baedal
       POSTGRES_PASSWORD: baedal
