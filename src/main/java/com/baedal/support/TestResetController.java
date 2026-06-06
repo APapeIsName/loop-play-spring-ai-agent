@@ -7,8 +7,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 2단계 멱등성 실험 전용: 매 trial 시작 시 Mock 시드 상태로 되돌리기 위한 내부 엔드포인트.
- * 실서비스 코드가 아니라 *테스트 환경* 전용. 운영 빌드에서는 제거하거나 프로파일로 가둬야 한다.
+ * 측정 인프라 전용: 매 trial 시작 시 Mock 시드 상태로 되돌리고 ETA를 현재 시각 기준으로 재생성.
+ * Round-2에서 만든 패턴(/api/v1/_internal/reset) 복원. round-3 raw 측정에서도 동일하게 사용.
+ * 실서비스 빌드에서는 제거하거나 프로파일로 가둬야 함.
  */
 @RestController
 @RequiredArgsConstructor

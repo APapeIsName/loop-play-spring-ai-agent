@@ -28,7 +28,6 @@ public class OrderMockService {
     void seed() {
         LocalDateTime now = LocalDateTime.now();
 
-        // 2024-1234: 배달 중 — getDeliveryStatus 호출 시 라이더 위치 확인용
         save(new Order(
                 "2024-1234",
                 "교촌치킨 강남점",
@@ -42,7 +41,6 @@ public class OrderMockService {
                 "배달 시작 · 현재 역삼역 사거리 부근",
                 OrderStatus.DELIVERING));
 
-        // 2024-1235: 주문 직후(CREATED) — cancelOrder → CANCELED 경로용
         save(new Order(
                 "2024-1235",
                 "버거킹 선릉점",
@@ -53,59 +51,50 @@ public class OrderMockService {
                 null,
                 OrderStatus.CREATED));
 
-        // 2024-1236: 배달 완료(DELIVERED) — 완료된 주문 상태/상세 조회 시나리오용
         save(new Order(
                 "2024-1236",
-                "스시미루 역삼점",
+                "스시로 서초점",
                 List.of(
-                        new OrderItem("연어 초밥 세트", 1, 28_000),
-                        new OrderItem("미소된장국", 1, 3_000)
+                        new OrderItem("모둠 초밥", 1, 28_000),
+                        new OrderItem("연어 롤", 1, 12_000)
                 ),
-                now.minusHours(1),
-                now.minusMinutes(10),
-                "서울시 강남구 역삼로 234",
+                now.minusMinutes(45),
+                now.minusMinutes(5),
+                "서울시 서초구 강남대로 465",
                 null,
                 OrderStatus.DELIVERED));
 
-        // 2024-1237: 조리 중(COOKING) — cancelOrder → NOT_CANCELABLE 경로
         save(new Order(
                 "2024-1237",
-                "맘스터치 강남역점",
-                List.of(
-                        new OrderItem("싸이버거 세트", 1, 9_800),
-                        new OrderItem("치즈스틱", 2, 2_500)
-                ),
-                now.minusMinutes(10),
-                now.plusMinutes(30),
-                "서울시 강남구 강남대로 396",
+                "마라탕후루 역삼점",
+                List.of(new OrderItem("마라탕 중 (매운맛)", 1, 14_000)),
+                now.minusMinutes(12),
+                now.plusMinutes(25),
+                "서울시 강남구 역삼로 123",
                 null,
                 OrderStatus.COOKING));
 
-        // 2024-1238: 사전 취소(CANCELED) — cancelOrder → ALREADY_CANCELED 경로 (멱등성)
-        // 중요: Order 생성 후 cancel()을 호출해야 canceledReason/canceledAt이 채워진다.
-        Order o1238 = new Order(
+        save(new Order(
                 "2024-1238",
-                "BBQ 선릉역점",
-                List.of(new OrderItem("황금올리브치킨", 1, 22_000)),
+                "맥도날드 삼성점",
+                List.of(
+                        new OrderItem("빅맥 세트", 1, 7_500),
+                        new OrderItem("애플파이", 2, 1_800)
+                ),
                 now.minusMinutes(30),
-                now.plusMinutes(20),
-                "서울시 강남구 선릉로 421",
+                now.minusMinutes(10),
+                "서울시 강남구 삼성로 212",
                 null,
-                OrderStatus.ACCEPTED);
-        o1238.cancel("고객 요청 — 주소 잘못 입력", now.minusMinutes(8));
-        save(o1238);
+                OrderStatus.CANCELED));
+        // 2024-1238은 사전에 취소된 상태 — 멱등성 시나리오 확인용
 
-        // 2024-1239: 사장님 수락 직후(ACCEPTED) — cancelOrder → CANCELED 경로
         save(new Order(
                 "2024-1239",
-                "교촌치킨 삼성점",
-                List.of(
-                        new OrderItem("레드콤보", 1, 24_000),
-                        new OrderItem("사이다 1.25L", 1, 3_000)
-                ),
-                now.minusMinutes(5),
-                now.plusMinutes(40),
-                "서울시 강남구 삼성로 567",
+                "요아정 강남역점",
+                List.of(new OrderItem("플레인 요거트 + 그래놀라", 1, 9_800)),
+                now.minusMinutes(2),
+                now.plusMinutes(28),
+                "서울시 강남구 강남대로 396",
                 null,
                 OrderStatus.ACCEPTED));
 
@@ -120,7 +109,7 @@ public class OrderMockService {
         return Optional.ofNullable(orders.get(orderId));
     }
 
-    // 2단계 멱등성 실험용: 매 trial 시작 시 시드 상태로 되돌린다.
+    // 측정 인프라: 매 trial 직전 호출. seed()가 LocalDateTime.now() 기준이라 ETA stale도 함께 해결.
     public void resetForTest() {
         orders.clear();
         seed();
