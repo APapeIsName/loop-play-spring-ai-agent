@@ -10,6 +10,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.stereotype.Component;
 
+import java.text.Normalizer;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -106,8 +107,12 @@ public class InputGuardrailAdvisor implements CallAdvisor {
 
         // ③ Prompt Injection — 패턴이 문장 일부에 섞여 있어도 잡아야 하므로
         //   전체 일치(matches)가 아니라 부분 일치(find)로 검사한다.
+        //   2차 우회 측정에서 정규식이 91%(31/34) 뚫린 것을 보강: 원문뿐 아니라
+        //   정규화본(NFKC·제로폭/구두점/공백 제거)도 함께 검사해 코드포인트 우회
+        //   (공백삽입·제로폭·전각·NFD분해)를 무력화한다.
+        String normalized = normalizeForCheck(input);
         for (Pattern pattern : INJECTION_PATTERNS) {
-            if (pattern.matcher(input).find()) {
+            if (pattern.matcher(input).find() || pattern.matcher(normalized).find()) {
                 return GuardrailResult.block("PROMPT_INJECTION",
                         "고객님, 그 부분은 제가 도와드리기 어려운 점 양해 부탁드려요. 주문·배달·환불 관련해서 궁금하신 건 무엇이든 말씀해 주세요.");
             }
@@ -115,6 +120,21 @@ public class InputGuardrailAdvisor implements CallAdvisor {
 
         // ④ 모든 검사 통과 — 정상 입력이므로 체인을 계속 진행한다.
         return GuardrailResult.allow("OK");
+    }
+
+    /**
+     * 우회 방어용 정규화 — 검사 전용이며 LLM에 보내는 원문은 바꾸지 않는다.
+     *   1) NFKC: 전각→반각, 호환 문자, NFD 결합 → 코드포인트 통일
+     *   2) 포맷/제로폭 문자(\p{Cf}) 제거 — 제로폭 공백·결합자 등
+     *   3) 구두점(\p{P})·공백류(\p{Z}/\s) 제거 — 음절 분리·구분자 삽입 무력화
+     * 단 정규식의 \s+(영문 패턴)는 공백 제거 시 깨지므로, check()는 원문과 정규화본을 모두 검사한다.
+     * 의미적·다국어·인코딩 우회는 코드포인트 정규화로 막히지 않는다(정규식의 원천적 한계).
+     */
+    private static String normalizeForCheck(String input) {
+        String n = Normalizer.normalize(input, Normalizer.Form.NFKC);
+        n = n.replaceAll("\\p{Cf}", "");
+        n = n.replaceAll("[\\p{P}\\p{Z}\\s]", "");
+        return n;
     }
 
     private String extractUserText(ChatClientRequest request) {
