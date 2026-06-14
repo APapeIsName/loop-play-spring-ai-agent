@@ -41,7 +41,10 @@ public class OutputGuardrailAdvisor implements CallAdvisor {
     /** 시스템 프롬프트 내부 섹션 키워드가 응답에 그대로 보이면 유출 가능성 — 안내 문구로 대체. */
     private static final List<String> LEAK_MARKERS = List.of(
             "[역할]", "[규칙]", "[금지]", "[Tool 사용 규칙]", "[정책 인용 규칙]",
-            "[안전 규칙]", "[응답 포맷]", "[대화 맥락 사용 규칙]"
+            "[안전 규칙]", "[응답 포맷]", "[대화 맥락 사용 규칙]",
+            // 2단계 측정 발견(s5_leak 5/5 유출): LLM이 대괄호 없이 "역할:" 형태로 풀어서 유출 →
+            // 콜론 형태 + 고유 섹션명도 탐지. ("규칙:"·"금지:"는 "환불 규칙:" 등 일반어 과탐 위험이라 제외)
+            "역할:", "안전 규칙", "Tool 사용 규칙", "정책 인용 규칙", "응답 포맷", "대화 맥락 사용 규칙"
     );
 
     private static final String LEAK_FALLBACK =
@@ -75,8 +78,25 @@ public class OutputGuardrailAdvisor implements CallAdvisor {
      */
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {
-        // TODO [2단계-A] 위 명세에 맞춰 Output 검사/치환을 구현하고 아래 기본 체인 통과를 제거하라.
-        return chain.nextCall(request);
+        ChatClientResponse response = chain.nextCall(request);   // 먼저 LLM까지 실행
+        String content = extractContent(response);
+
+        // 1) 빈 응답 → 안내 문구
+        if (content == null || content.isBlank()) {
+            return replace(response, request, EMPTY_FALLBACK, "EMPTY_RESPONSE");
+        }
+        // 2) 시스템 프롬프트 유출 마커 → 통째 치환 (유출이 더 심각하므로 sensitive보다 먼저)
+        for (String marker : LEAK_MARKERS) {
+            if (content.contains(marker)) {
+                return replace(response, request, LEAK_FALLBACK, "PROMPT_LEAK");
+            }
+        }
+        // 3) 민감정보 → 값만 마스킹
+        if (masker.containsSensitive(content)) {
+            return replace(response, request, masker.mask(content), "SENSITIVE_MASKED");
+        }
+        // 4) 문제 없음 → 원본 그대로
+        return response;
     }
 
     private String extractContent(ChatClientResponse response) {

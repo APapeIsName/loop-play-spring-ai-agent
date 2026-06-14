@@ -35,7 +35,8 @@ public class SensitiveDataMasker {
      */
     private static final Pattern ROAD_ADDRESS = Pattern.compile(
             "(?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충청|전라|경상|제주)" +
-                    "(?:특별시|광역시|특별자치시|도|특별자치도)?\\s*" +
+                    // '시' 추가: '서울시'(지역+시) 형태 보강. 단독 '시'가 없으면 '서울시 강남구…'를 놓친다.
+                    "(?:특별시|광역시|특별자치시|특별자치도|도|시)?\\s*" +
                     "[가-힣]+(?:시|군|구)\\s+[가-힣0-9\\-\\s]{2,30}(?:동|읍|면|로|길)\\s*\\d+(?:-\\d+)?");
 
     /**
@@ -61,8 +62,17 @@ public class SensitiveDataMasker {
      *   raw에서 숫자만 뽑으려면 raw.replaceAll("\\D", "").
      */
     private String maskPhone(String text) {
-        // TODO [2단계-B] 전화번호 마스킹 구현
-        return text;
+        Matcher m = PHONE_KR.matcher(text);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            String digits = m.group().replaceAll("\\D", ""); // 형식 무관 숫자만: 010-1234-5678 / 010 1234 5678 → 0101234567...
+            String prefix = digits.substring(0, 3);            // 앞 3자리 보존(010·011·016… 왜곡 방지)
+            String last4 = digits.substring(digits.length() - 4);
+            m.appendReplacement(sb, Matcher.quoteReplacement(prefix + "-****-" + last4));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+        // 한계: 국제표기(+82 10-…)는 앞 0이 빠져 PHONE_KR이 못 잡음 → findings_quest2.md 실패관찰 참조.
     }
 
     /**
@@ -72,8 +82,18 @@ public class SensitiveDataMasker {
      *   로컬 파트 길이가 1 이하면 전체를 "*" 로.
      */
     private String maskEmail(String text) {
-        // TODO [2단계-C] 이메일 마스킹 구현
-        return text;
+        Matcher m = EMAIL.matcher(text);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            String email = m.group();
+            int at = email.indexOf('@');
+            String local = email.substring(0, at);
+            String domain = email.substring(at);                  // "@woowahan.com"
+            String maskedLocal = local.length() <= 1 ? "*" : local.charAt(0) + "***";
+            m.appendReplacement(sb, Matcher.quoteReplacement(maskedLocal + domain));
+        }
+        m.appendTail(sb);
+        return sb.toString();
     }
 
     /**
@@ -82,8 +102,8 @@ public class SensitiveDataMasker {
      * TODO [2단계-D] ROAD_ADDRESS.matcher(text).replaceAll(...) 한 줄이면 충분하다.
      */
     private String maskAddress(String text) {
-        // TODO [2단계-D] 주소 마스킹 구현
-        return text;
+        // 주소는 구성요소가 많아 값만 가리기 어렵다 → 매칭 구간을 통째로 대체.
+        return ROAD_ADDRESS.matcher(text).replaceAll("[주소 비공개]");
     }
 
     /**
