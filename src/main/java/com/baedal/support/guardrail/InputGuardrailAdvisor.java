@@ -91,8 +91,30 @@ public class InputGuardrailAdvisor implements CallAdvisor {
      *   (예: "고객님, 저는 주문/배달/환불 관련 상담만 도와드릴 수 있어요.")
      */
     public GuardrailResult check(String input) {
-        // TODO [1단계-A] 위 명세에 맞춰 로직을 작성하고 아래 기본 allow를 제거하라.
-        return GuardrailResult.allow("TODO");
+        // ① 빈 입력 — null/공백만 있는 입력은 LLM 호출 가치가 없고,
+        //   아래 length()/matcher() 검사의 NPE도 선제적으로 막는다(그래서 맨 앞).
+        if (input == null || input.isBlank()) {
+            return GuardrailResult.block("EMPTY_INPUT",
+                    "고객님, 문의 내용이 아직 안 보이네요. 어떤 점이 궁금하신지 편하게 적어주시겠어요?");
+        }
+
+        // ② 길이 초과 — 과도하게 긴 입력은 토큰/비용 남용(서비스 거부)을 막기 위해 차단.
+        if (input.length() > MAX_INPUT_CHARS) {
+            return GuardrailResult.block("INPUT_TOO_LONG",
+                    "고객님, 내용이 좀 길어서 한 번에 확인이 어려워요. 제일 궁금하신 것부터 짧게 말씀해 주시면 바로 확인해 드릴게요.");
+        }
+
+        // ③ Prompt Injection — 패턴이 문장 일부에 섞여 있어도 잡아야 하므로
+        //   전체 일치(matches)가 아니라 부분 일치(find)로 검사한다.
+        for (Pattern pattern : INJECTION_PATTERNS) {
+            if (pattern.matcher(input).find()) {
+                return GuardrailResult.block("PROMPT_INJECTION",
+                        "고객님, 그 부분은 제가 도와드리기 어려운 점 양해 부탁드려요. 주문·배달·환불 관련해서 궁금하신 건 무엇이든 말씀해 주세요.");
+            }
+        }
+
+        // ④ 모든 검사 통과 — 정상 입력이므로 체인을 계속 진행한다.
+        return GuardrailResult.allow("OK");
     }
 
     private String extractUserText(ChatClientRequest request) {
