@@ -68,14 +68,17 @@ public class SupportController {
             );
         }
 
-        // TODO [3단계-C] Handoff 선검사를 추가하라.
-        //   handoffDetector.detect(req.message())의 handoff==true면 Structured Output 스키마에 맞춰
-        //   SupportResponse를 수동 조립하여 반환한다.
-        //     - summary: decision.message()
-        //     - category: Category.ETC
-        //     - urgency:  Urgency.HIGH
-        //     - nextAction: "상담원 연결 진행"
-        //     - neededInfo: List.of() 또는 ["상담원 응대 대기"]
+        // [3단계-C] Handoff 선검사 — LLM 호출 전에 Structured Output 스키마로 상담원 전환 응답을 조립.
+        HandoffDetector.HandoffDecision handoff = handoffDetector.detect(req.message());
+        if (handoff.handoff()) {
+            return new SupportResponse(
+                    handoff.message(),
+                    SupportResponse.Category.ETC,
+                    SupportResponse.Urgency.HIGH,
+                    "상담원 연결 진행",
+                    List.of("상담원 응대 대기")
+            );
+        }
 
         return chatClient.prompt()
                 .user(req.message())

@@ -83,10 +83,13 @@ public class AssistantController {
             return guard.fallbackMessage();
         }
 
-        // TODO [3단계-B] Handoff 선검사 — LLM 호출 전에 바로 상담원 연결 응답을 돌려주는 편이
-        //    토큰 비용/지연/감정 대응 모두 유리하다.
-        //    handoffDetector.detect(req.message()) 결과가 handoff==true 면 즉시 decision.message()를 리턴하라.
-        //    왜 LLM 호출 전에 하는지를 README 설계 결정 섹션에 서술하라.
+        // [3단계-B] Handoff 선검사 — LLM 호출 전에 상담원 전환 응답을 돌려준다.
+        //   토큰/지연 절감 + 일관된 문구 + LLM의 "도와드릴게요" 회피 방지.
+        HandoffDetector.HandoffDecision handoff = handoffDetector.detect(req.message());
+        if (handoff.handoff()) {
+            log.info("[Assistant] 상담원 전환 — reason={}", handoff.reason());
+            return handoff.message();
+        }
 
         // TODO [4단계-A] try/catch로 감싸서 LLM/Tool/VectorStore 예외 시 fallback(e)로 안전 응답을 돌려주라.
         //    스택트레이스는 절대 외부에 노출하지 않는다(log.error로 내부 로그에만 남김).
