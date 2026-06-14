@@ -56,10 +56,7 @@ public class SensitiveDataMasker {
 
     /**
      * 뒷 4자리만 남기고 가운데를 *로. 010-1234-5678 → 010-****-5678
-     *
-     * TODO [2단계-B] PHONE_KR Matcher로 순회하며 매칭된 번호를 "010-****-(뒤 4자리)" 로 치환하라.
-     *   힌트: Matcher.appendReplacement + Matcher.quoteReplacement를 사용하면 안전하다.
-     *   raw에서 숫자만 뽑으려면 raw.replaceAll("\\D", "").
+     * appendReplacement + quoteReplacement로 안전하게 순회 치환한다.
      */
     private String maskPhone(String text) {
         Matcher m = PHONE_KR.matcher(text);
@@ -77,9 +74,7 @@ public class SensitiveDataMasker {
 
     /**
      * name@domain.com → n***@domain.com
-     *
-     * TODO [2단계-C] EMAIL Matcher로 순회하며 '@' 앞 로컬 파트의 첫 글자만 남기고 "***"로 치환하라.
-     *   로컬 파트 길이가 1 이하면 전체를 "*" 로.
+     * '@' 앞 로컬 파트는 첫 글자만 남기고 "***", 길이가 1 이하면 전체를 "*"로.
      */
     private String maskEmail(String text) {
         Matcher m = EMAIL.matcher(text);
@@ -97,9 +92,7 @@ public class SensitiveDataMasker {
     }
 
     /**
-     * 주소는 전체를 "[주소 비공개]"로 대체.
-     *
-     * TODO [2단계-D] ROAD_ADDRESS.matcher(text).replaceAll(...) 한 줄이면 충분하다.
+     * 주소는 매칭 구간 전체를 "[주소 비공개]"로 대체한다.
      */
     private String maskAddress(String text) {
         // 주소는 구성요소가 많아 값만 가리기 어렵다 → 매칭 구간을 통째로 대체.

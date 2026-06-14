@@ -67,14 +67,10 @@ public class OutputGuardrailAdvisor implements CallAdvisor {
     }
 
     /**
-     * TODO [2단계-A] 출력 검사 로직을 직접 구현하라.
-     *   1) chain.nextCall(request)로 LLM 응답을 받는다.
-     *   2) extractContent(response)로 텍스트를 꺼낸다. null/blank면 EMPTY_FALLBACK으로 replace.
-     *   3) LEAK_MARKERS 중 하나라도 응답에 포함되면 LEAK_FALLBACK으로 replace ("PROMPT_LEAK").
-     *   4) masker.containsSensitive(text)가 true면 masker.mask(text)로 replace ("SENSITIVE_MASKED").
-     *   5) 모두 문제 없으면 원본 response 그대로 반환.
-     *
-     *   replace(...) 헬퍼가 이미 제공된다. log.warn으로 사유를 남겨 감사가 가능하게 하라.
+     * 출력 검사: chain.nextCall로 LLM 응답을 받은 뒤
+     * ① 빈 응답(EMPTY_FALLBACK) → ② LEAK_MARKERS 포함(PROMPT_LEAK → LEAK_FALLBACK)
+     * → ③ 민감정보 포함(SENSITIVE_MASKED → mask) 순으로 검사하고, 문제 없으면 원본을 그대로 반환한다.
+     * 치환 시 log.warn으로 사유를 남겨 감사가 가능하게 한다.
      */
     @Override
     public ChatClientResponse adviseCall(ChatClientRequest request, CallAdvisorChain chain) {

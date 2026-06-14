@@ -81,15 +81,8 @@ public class InputGuardrailAdvisor implements CallAdvisor {
 
     /**
      * 입력 검사 로직. 외부 테스트/단위 테스트에서도 쓸 수 있도록 public.
-     *
-     * TODO [1단계-A] 아래 로직을 직접 채워라.
-     *   1) input이 null이거나 blank면 EMPTY_INPUT 사유로 block
-     *   2) input.length() > MAX_INPUT_CHARS 이면 INPUT_TOO_LONG 사유로 block
-     *   3) INJECTION_PATTERNS 중 하나라도 match되면 PROMPT_INJECTION 사유로 block
-     *   4) 모두 통과하면 GuardrailResult.allow("OK") 반환
-     *
-     *   block 시 fallbackMessage는 고객에게 보이는 안내 문구이므로 친근한 톤으로 작성하라.
-     *   (예: "고객님, 저는 주문/배달/환불 관련 상담만 도와드릴 수 있어요.")
+     * 순서: ① 빈 입력(EMPTY_INPUT) → ② 길이 초과(INPUT_TOO_LONG) → ③ injection(PROMPT_INJECTION),
+     * 모두 통과하면 allow. block 시 fallbackMessage는 고객에게 보이는 친근한 안내 문구다.
      */
     public GuardrailResult check(String input) {
         // ① 빈 입력 — null/공백만 있는 입력은 LLM 호출 가치가 없고,

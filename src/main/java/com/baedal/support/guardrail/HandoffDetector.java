@@ -47,17 +47,9 @@ public class HandoffDetector {
     );
 
     /**
-     * TODO [3단계-A] 상담원 전환 트리거 판별 로직을 구현하라.
-     *   1) input이 null이거나 blank → HandoffDecision.none()
-     *   2) EXPLICIT_PATTERNS 매치 → handoff(EXPLICIT_REQUEST, "네, 바로 상담원에게 연결해 드릴게요. ...")
-     *   3) LEGAL_PATTERNS 매치 → handoff(LEGAL_ISSUE, "법적/민원 관련 사안은 전문 상담원이 ...")
-     *   4) ANGER_PATTERNS 매치 → handoff(HIGH_EMOTION, "많이 불편하셨을 것 같아 ...")
-     *   5) 어느 것도 아니면 none()
-     *
-     *   **우선순위 판단**: EXPLICIT → LEGAL → ANGER 순이 안전하다.
-     *   이유는 /mission/README.md 설계 결정 섹션에 직접 서술하라.
-     *   메시지 말미에는 연결 번호 "1600-0987" 을 반드시 포함시켜 상담원 전환이
-     *   실제 동작 가능함을 보이라.
+     * 상담원 전환 트리거 판별. 우선순위 EXPLICIT → LEGAL → ANGER 순으로 검사하고,
+     * 매치되면 연결 번호 "1600-0987"을 포함한 안내 메시지로 handoff, 아니면 none().
+     * (우선순위 근거는 round5/README.md 설계 결정 섹션 참조.)
      */
     public HandoffDecision detect(String input) {
         if (input == null || input.isBlank()) {
